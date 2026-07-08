@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DexGuesser</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128269;</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Dex<span class="accent">Guesser</span></h1>
+    <p class="tagline">Guess the Pok&eacute;mon from its Pok&eacute;dex entries</p>
+  </header>
+
+  <main>
+    <div id="loading">Loading today's Pok&eacute;mon&hellip;</div>
+
+    <div id="game" hidden>
+      <div id="guess-dots" aria-label="Guesses remaining"></div>
+
+      <div id="entries"></div>
+
+      <form id="guess-form" autocomplete="off">
+        <div class="input-wrap">
+          <input type="text" id="guess-input" placeholder="Who's that Pok&eacute;mon?"
+                 spellcheck="false" autocapitalize="off">
+          <ul id="suggestions" hidden></ul>
+        </div>
+      </form>
+
+      <div id="guess-history"></div>
+
+      <div id="result" hidden>
+        <img id="result-sprite" alt="">
+        <h2 id="result-title"></h2>
+        <p id="result-answer"></p>
+        <p id="countdown"></p>
+      </div>
+    </div>
+
+    <div id="error" hidden>
+      <p>Couldn't reach Pok&eacute;API. Check your connection and
+        <button id="retry">try again</button>.</p>
+    </div>
+  </main>
+
+  <footer>
+    Pok&eacute;mon data from <a href="https://pokeapi.co" target="_blank" rel="noopener">Pok&eacute;API</a>
+  </footer>
+
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+:root {
+  --bg: #0f1220;
+  --card: #1b2036;
+  --card-border: #2b3252;
+  --text: #e8eaf2;
+  --muted: #8b91ad;
+  --accent: #ef5350;
+  --gold: #f5c542;
+  --green: #4caf7d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+}
+
+header {
+  text-align: center;
+  padding: 2rem 1rem 0.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.4rem;
+  letter-spacing: 0.02em;
+}
+
+.accent { color: var(--accent); }
+
+.tagline {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+#loading, #error {
+  text-align: center;
+  color: var(--muted);
+  padding: 3rem 0;
+}
+
+#error button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+/* --- Guess dots ------------------------------------------------------- */
+
+#guess-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 2px solid var(--muted);
+}
+
+.dot.used { background: var(--accent); border-color: var(--accent); }
+.dot.won { background: var(--green); border-color: var(--green); }
+
+/* --- Pokédex entries --------------------------------------------------- */
+
+.entry {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-left: 4px solid var(--gold);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 0.9rem;
+  animation: fade-in 0.35s ease;
+}
+
+.entry p { margin: 0; }
+
+.entry-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  margin-bottom: 0.3rem;
+}
+
+.no-more {
+  text-align: center;
+  color: var(--muted);
+  font-style: italic;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- Input & autocomplete ---------------------------------------------- */
+
+.input-wrap { position: relative; }
+
+#guess-input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  font-size: 1.05rem;
+  color: var(--text);
+  background: var(--card);
+  border: 2px solid var(--card-border);
+  border-radius: 10px;
+  outline: none;
+}
+
+#guess-input:focus { border-color: var(--accent); }
+
+#guess-input.shake { animation: shake 0.3s; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+#suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+#suggestions li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+#suggestions li img {
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+#suggestions li .dexno {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+#suggestions li.highlighted,
+#suggestions li:hover {
+  background: var(--card-border);
+}
+
+/* --- Guess history ------------------------------------------------------ */
+
+#guess-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.chip {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.chip.wrong { background: rgba(239, 83, 80, 0.15); color: var(--accent); }
+.chip.correct { background: rgba(76, 175, 125, 0.15); color: var(--green); }
+
+/* --- Result panel ------------------------------------------------------- */
+
+#result {
+  text-align: center;
+  margin-top: 1.5rem;
+  animation: fade-in 0.35s ease;
+}
+
+#result-sprite {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+
+#result h2 { margin: 0.5rem 0 0.25rem; }
+#result h2.win { color: var(--green); }
+#result h2.lose { color: var(--accent); }
+
+#result-answer { margin: 0; font-size: 1.1rem; }
+
+#result .dexno { color: var(--muted); }
+
+#countdown {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.75rem;
+}
+
+/* --- Footer ------------------------------------------------------------- */
+
+footer {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+footer a { color: var(--muted); }
