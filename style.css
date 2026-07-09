@@ -107,8 +107,8 @@ main {
   margin-bottom: 0.3rem;
 }
 
-.no-more {
-  text-align: center;
+.entry.no-entry {
+  border-left-color: var(--muted);
   color: var(--muted);
   font-style: italic;
 }

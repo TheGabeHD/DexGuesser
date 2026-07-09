@@ -22,18 +22,30 @@ python3 -m http.server
 All Pokémon data is baked into the repo so the live site makes **zero**
 calls to external APIs:
 
-- `data/species.json` — id, slug, and display name for every species
-  (powers the autocomplete)
+- `data/species.json` — id, slug, and display name for every guessable
+  Pokémon (powers the autocomplete). Mega/Primal forms are included and
+  carry their base Pokémon's national dex number in `dex`.
 - `data/entries/{id}.json` — cleaned, de-duplicated English Pokédex
-  entries per species
-- `sprites/{id}.png` — icon for every species (from the
-  [PokeAPI sprites repo](https://github.com/PokeAPI/sprites))
+  entries per Pokémon
+- `sprites/{id}.png` — icon for every Pokémon (from the
+  [PokeAPI sprites repo](https://github.com/PokeAPI/sprites)).
+  Mega Zygarde has no upstream sprite yet, so `10301.png` is a copy of
+  the base Zygarde icon — replace it when upstream adds one.
+
+Base-species entries come from [PokéAPI](https://pokeapi.co). Mega and
+Primal forms have their own in-game entries (Sun/Moon, Let's Go, and
+Legends: Z-A) that PokéAPI doesn't carry, so those are parsed from each
+Pokémon's [Bulbapedia](https://bulbapedia.bulbagarden.net) page.
 
 To refresh the JSON data (e.g. when a new generation is released):
 
 ```bash
 node scripts/build-data.mjs
 ```
+
+Every raw download is cached under `raw/` (gitignored, ~30 MB), so
+re-running the script makes **no network requests** unless a cache file
+is missing. Delete `raw/` to force a full refetch.
 
 New sprites can be pulled from the PokeAPI sprites repo with a sparse
 clone (`git clone --depth 1 --filter=blob:none --sparse

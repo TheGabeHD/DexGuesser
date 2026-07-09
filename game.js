@@ -84,14 +84,18 @@ async function loadSpeciesList() {
 // Pokédex entries
 // ---------------------------------------------------------------------------
 
-// Censor the Pokémon's own name so the entry doesn't give it away
+// Censor the Pokémon's own name so the entry doesn't give it away. "Mega" and
+// "Primal" stay visible ("Mega Evolution" is a legitimate part of the hint —
+// the player still has to figure out which Mega it is).
+const REDACT_KEEP = new Set(['mega', 'primal']);
+
 function redactName(text, species) {
   const tokens = new Set([species.name, species.slug]);
   for (const part of species.name.split(/[\s\-.]+/)) {
-    if (part.length >= 3) tokens.add(part);
+    if (part.length >= 3 && !REDACT_KEEP.has(part.toLowerCase())) tokens.add(part);
   }
   for (const part of species.slug.split('-')) {
-    if (part.length >= 3) tokens.add(part);
+    if (part.length >= 3 && !REDACT_KEEP.has(part)) tokens.add(part);
   }
   // Longest first so "Mr. Mime" is redacted before "Mime"
   const sorted = [...tokens].sort((a, b) => b.length - a.length);
@@ -147,6 +151,10 @@ function restoreProgress() {
 
 const $ = id => document.getElementById(id);
 
+// National dex number for display; mega/primal forms carry their base
+// Pokémon's number in `dex` (their internal id is a large form id)
+const dexNo = sp => String(sp.dex ?? sp.id).padStart(4, '0');
+
 function render() {
   renderDots();
   renderEntries();
@@ -180,7 +188,11 @@ function renderEntries() {
     );
   }
   if (state.status === 'playing' && wrongCount + 1 > state.entries.length) {
-    html.push(`<p class="no-more">No more entries for this one — last chance!</p>`);
+    html.push(
+      `<div class="entry no-entry">
+        <p>No more entries exist for this Pokémon.</p>
+      </div>`
+    );
   }
   $('entries').innerHTML = html.join('');
 }
@@ -212,7 +224,7 @@ function renderResult() {
     $('result-title').className = 'lose';
   }
   $('result-answer').innerHTML =
-    `It was <strong>${state.daily.name}</strong> <span class="dexno">#${String(state.daily.id).padStart(4, '0')}</span>`;
+    `It was <strong>${state.daily.name}</strong> <span class="dexno">#${dexNo(state.daily)}</span>`;
   startCountdown();
 }
 
@@ -297,7 +309,7 @@ function updateSuggestions() {
     `<li data-index="${i}" class="${i === highlighted ? 'highlighted' : ''}">
       <img src="${SPRITE_URL(sp.id)}" alt="" loading="lazy" width="40" height="40">
       <span>${sp.name}</span>
-      <span class="dexno">#${String(sp.id).padStart(4, '0')}</span>
+      <span class="dexno">#${dexNo(sp)}</span>
     </li>`
   ).join('');
   ul.hidden = false;
