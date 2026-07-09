@@ -58,4 +58,11 @@ clone (`git clone --depth 1 --filter=blob:none --sparse
 https://github.com/PokeAPI/sprites.git`, then check out
 `/sprites/pokemon/*.png` and copy the base-species files here).
 
-Pokémon data from [PokéAPI](https://pokeapi.co).
+## Credits
+
+- Pokédex data from [PokéAPI](https://pokeapi.co) and
+  [Bulbapedia](https://bulbapedia.bulbagarden.net) (form entries, used
+  under [CC BY-NC-SA 2.5](https://creativecommons.org/licenses/by-nc-sa/2.5/))
+- Sprites from the [PokéAPI sprites repo](https://github.com/PokeAPI/sprites)
+- Pokémon and all related names are © Nintendo, Game Freak, and The
+  Pokémon Company. This is an unofficial fan project.
