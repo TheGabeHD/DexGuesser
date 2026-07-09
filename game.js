@@ -85,13 +85,16 @@ async function loadSpeciesList() {
 // ---------------------------------------------------------------------------
 
 // Censor the Pokémon's own name so the entry doesn't give it away. Form words
-// like "Mega" stay visible ("Mega Evolution" is a legitimate part of the
-// hint — the player still has to figure out which Mega it is).
-const REDACT_KEEP = new Set(['mega', 'primal', 'gigantamax', 'gmax', 'style']);
+// like "Mega" or "Alolan" stay visible ("Mega Evolution" is a legitimate part
+// of the hint — the player still has to figure out which Mega it is).
+const REDACT_KEEP = new Set([
+  'mega', 'primal', 'gigantamax', 'gmax', 'style', 'breed', 'mode', 'standard', 'zen',
+  'alolan', 'alola', 'galarian', 'galar', 'hisuian', 'hisui', 'paldean', 'paldea',
+]);
 
 function redactName(text, species) {
   const tokens = new Set([species.name, species.slug]);
-  for (const part of species.name.split(/[\s\-.]+/)) {
+  for (const part of species.name.split(/[\s\-.()]+/)) {
     if (part.length >= 3 && !REDACT_KEEP.has(part.toLowerCase())) tokens.add(part);
   }
   for (const part of species.slug.split('-')) {

@@ -113,12 +113,23 @@ function cleanFlavorText(text) {
 
 // Strip wiki markup from a Bulbapedia dex entry
 function cleanWikiText(text) {
-  return text
+  let out = text
     .replace(/<br\s*\/?>/gi, ' ')
     .replace(/<[^>]+>/g, '')                      // html tags like <sc>
     .replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, '$1')  // [[link|label]] -> label
-    .replace(/\[\[([^\]]*)\]\]/g, '$1')           // [[link]] -> link
-    .replace(/\{\{[^{}]*\}\}/g, '')               // inner templates
+    .replace(/\[\[([^\]]*)\]\]/g, '$1');          // [[link]] -> link
+  // Resolve templates innermost-first. {{tt|shown|tooltip}}-style templates
+  // keep their first argument; link templates like {{p|Name|shown text}}
+  // display their last; argless ones like {{fact}} render nothing.
+  for (let i = 0; i < 5 && out.includes('{{'); i++) {
+    out = out.replace(/\{\{([^{}]*)\}\}/g, (_, inner) => {
+      const parts = inner.split('|').map(s => s.trim());
+      if (parts.length === 1) return '';
+      if (['tt', 'obp', 'scpkmn', 'scball'].includes(parts[0].toLowerCase())) return parts[1];
+      return parts[parts.length - 1];
+    });
+  }
+  return out
     .replace(/''+/g, '')                          // bold/italic quotes
     .replace(/\s+/g, ' ')
     .trim();
@@ -186,24 +197,9 @@ console.log(`base species: ${species.length}`);
 
 await mkdir(path.join(ROOT, 'data', 'entries'), { recursive: true });
 
-let done = 0;
-const noEntries = [];
-await pool(species, async sp => {
-  const detail = JSON.parse(await cached(
-    `pokeapi/species/${sp.id}.json`, `${API}/pokemon-species/${sp.id}`));
-  const entries = dedupe(detail.flavor_text_entries
-    .filter(e => e.language.name === 'en')
-    .map(e => cleanFlavorText(e.flavor_text)));
-  if (entries.length === 0) noEntries.push(sp.slug);
-  await writeFile(
-    path.join(ROOT, 'data', 'entries', `${sp.id}.json`), JSON.stringify(entries));
-  if (++done % 200 === 0) console.log(`base entries: ${done}/${species.length}`);
-}, CONCURRENCY);
-console.log(`base entries: ${done}/${species.length} written`);
-if (noEntries.length) console.log(`WARNING - no English entries for: ${noEntries.join(', ')}`);
-
 // ---------------------------------------------------------------------------
-// 2. Mega/Primal forms: ids from PokéAPI, entries from Bulbapedia
+// 2. Special forms (Mega/Primal/Gigantamax/regional): ids from PokéAPI,
+//    entries from Bulbapedia
 // ---------------------------------------------------------------------------
 
 const pokemonList = JSON.parse(await cached(
@@ -223,15 +219,38 @@ function baseOf(formSlug) {
 
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
+const REGIONS = { alola: 'Alolan', galar: 'Galarian', hisui: 'Hisuian', paldea: 'Paldean' };
+
 // Display name for the form plus the {{Dex/Form|...}} labels Bulbapedia might
 // use for it, in order of preference. Middle slug tokens like male/curly/
 // original are cosmetic sub-variants that share one set of entries; they
 // resolve to the same display name and collapse below. Urshifu's two styles
 // have distinct Gigantamax entries and stay separate via the style label.
+// Regional forms get `regional: true` so their entry texts can be subtracted
+// from the base Pokémon's pool (PokéAPI mixes them together).
 function formMeta(formSlug, base) {
   if (formSlug.endsWith('-primal')) {
     return { name: `Primal ${base.name}`,
              labels: [`Primal ${base.name}`, 'Primal Reversion'] };
+  }
+  const rm = formSlug.match(/-(alola|galar|hisui|paldea)(?:-(.+))?$/);
+  if (rm) {
+    const adj = REGIONS[rm[1]];
+    const mid = rm[2] ? rm[2].split('-').map(cap).join(' ') : ''; // 'Combat Breed', 'Standard', 'Zen'
+    let name = `${adj} ${base.name}`;
+    const labels = [];
+    if (mid === 'Standard') {
+      labels.push(`${adj} Form`);                     // Galarian Darmanitan
+    } else if (mid === 'Zen') {
+      name += ' (Zen Mode)';
+      labels.push(`${adj} Form/Zen Mode`);
+    } else if (mid) {
+      name += ` (${mid})`;                            // Paldean Tauros breeds
+      labels.push(`${adj} Form (${mid})`);
+    } else {
+      labels.push(`${adj} Form`, `${adj} ${base.name}`);
+    }
+    return { name, labels, regional: true };
   }
   if (formSlug.endsWith('-gmax')) {
     // Tokens between the base slug and '-gmax', e.g. 'single-strike' or ''
@@ -247,7 +266,8 @@ function formMeta(formSlug, base) {
 }
 
 const forms = pokemonList.results
-  .filter(p => /-mega(-[a-z]+)?$|-primal$|-gmax$/.test(p.name))
+  .filter(p => /-mega(-[a-z]+)?$|-primal$|-gmax$|-(alola|galar|hisui|paldea)(-[a-z]+)*$/.test(p.name)
+            && !p.name.endsWith('-cap')) // costume Pikachu, not a regional form
   .map(p => ({ slug: p.name, id: Number(p.url.match(/\/(\d+)\/?$/)[1]) }))
   .sort((a, b) => a.id - b.id);
 const known = [];
@@ -272,6 +292,7 @@ console.log(`bulbapedia pages: ${formBases.length}`);
 const formSpecies = [];
 const taken = new Set();
 const unmatched = [];
+const regionalKeys = new Map(); // base species id -> Set of entry dedupe keys
 for (const form of known) {
   const byForm = parseDexEntries(wikitexts.get(form.base.slug));
   const meta = formMeta(form.slug, form.base);
@@ -299,6 +320,13 @@ for (const form of known) {
     unmatched.push(`${form.slug} (forms on page: ${[...byForm.keys()].filter(Boolean).join(', ') || 'none'})`);
     continue;
   }
+  // Remember regional entry texts so they can be removed from the base
+  // Pokémon's pool (PokéAPI attaches them to the base species)
+  if (meta.regional) {
+    let set = regionalKeys.get(form.base.id);
+    if (!set) regionalKeys.set(form.base.id, set = new Set());
+    for (const t of entries) set.add(dedupeKey(t));
+  }
   if (taken.has(name)) continue; // e.g. both Toxtricity modes share one Gigantamax
   taken.add(name);
   await writeFile(
@@ -313,7 +341,35 @@ if (unmatched.length) {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Combined species list
+// 3. Base-species entries from PokéAPI, minus regional-form texts
+// ---------------------------------------------------------------------------
+
+let done = 0;
+let subtracted = 0;
+const noEntries = [];
+await pool(species, async sp => {
+  const detail = JSON.parse(await cached(
+    `pokeapi/species/${sp.id}.json`, `${API}/pokemon-species/${sp.id}`));
+  let entries = dedupe(detail.flavor_text_entries
+    .filter(e => e.language.name === 'en')
+    .map(e => cleanFlavorText(e.flavor_text)));
+  const regional = regionalKeys.get(sp.id);
+  if (regional) {
+    const before = entries.length;
+    entries = entries.filter(t => !regional.has(dedupeKey(t)));
+    subtracted += before - entries.length;
+  }
+  if (entries.length === 0) noEntries.push(sp.slug);
+  await writeFile(
+    path.join(ROOT, 'data', 'entries', `${sp.id}.json`), JSON.stringify(entries));
+  if (++done % 200 === 0) console.log(`base entries: ${done}/${species.length}`);
+}, CONCURRENCY);
+console.log(`base entries: ${done}/${species.length} written`);
+console.log(`regional entries subtracted from base pools: ${subtracted}`);
+if (noEntries.length) console.log(`WARNING - no English entries for: ${noEntries.join(', ')}`);
+
+// ---------------------------------------------------------------------------
+// 4. Combined species list
 // ---------------------------------------------------------------------------
 
 await writeFile(
