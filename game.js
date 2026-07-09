@@ -4,37 +4,14 @@
 // Config & constants
 // ---------------------------------------------------------------------------
 
-const API = 'https://pokeapi.co/api/v2';
-const SPRITE_URL = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
-const ARTWORK_URL = id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+// All data and images are baked into the site by scripts/build-data.mjs,
+// so the browser never calls PokéAPI directly.
+const SPRITE_URL = id => `sprites/${id}.png`;
 
 const MAX_GUESSES = 3;
 const MAX_SUGGESTIONS = 8;
 
-const STORAGE_SPECIES = 'dexguesser-species-v1';
 const STORAGE_PROGRESS = 'dexguesser-progress-v1';
-
-// API slugs whose display name isn't just "capitalize and swap hyphens for spaces"
-const NAME_OVERRIDES = {
-  'nidoran-f': 'Nidoran♀',
-  'nidoran-m': 'Nidoran♂',
-  'farfetchd': "Farfetch'd",
-  'mr-mime': 'Mr. Mime',
-  'ho-oh': 'Ho-Oh',
-  'mime-jr': 'Mime Jr.',
-  'porygon-z': 'Porygon-Z',
-  'type-null': 'Type: Null',
-  'jangmo-o': 'Jangmo-o',
-  'hakamo-o': 'Hakamo-o',
-  'kommo-o': 'Kommo-o',
-  'sirfetchd': "Sirfetch'd",
-  'mr-rime': 'Mr. Rime',
-  'flabebe': 'Flabébé',
-  'wo-chien': 'Wo-Chien',
-  'chien-pao': 'Chien-Pao',
-  'ting-lu': 'Ting-Lu',
-  'chi-yu': 'Chi-Yu',
-};
 
 // ---------------------------------------------------------------------------
 // Game state
@@ -88,47 +65,24 @@ function pickDaily(speciesList, dateKey) {
 // Species list & names
 // ---------------------------------------------------------------------------
 
-function displayName(slug) {
-  if (NAME_OVERRIDES[slug]) return NAME_OVERRIDES[slug];
-  return slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
 // Normalized form used to match what the user types ("mr mime", "farfetchd"...)
 function searchKey(str) {
   return str.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
 }
 
 async function loadSpeciesList() {
-  const cached = localStorage.getItem(STORAGE_SPECIES);
-  if (cached) return JSON.parse(cached);
-
-  const res = await fetch(`${API}/pokemon-species?limit=2000`);
+  const res = await fetch('data/species.json');
   if (!res.ok) throw new Error(`species list: HTTP ${res.status}`);
   const data = await res.json();
-
-  const list = data.results.map(r => {
-    const id = Number(r.url.match(/\/(\d+)\/?$/)[1]);
-    const name = displayName(r.name);
-    return { id, slug: r.name, name, searchKey: searchKey(name) + '|' + searchKey(r.name) };
-  });
-
-  localStorage.setItem(STORAGE_SPECIES, JSON.stringify(list));
-  return list;
+  return data.map(sp => ({
+    ...sp,
+    searchKey: searchKey(sp.name) + '|' + searchKey(sp.slug),
+  }));
 }
 
 // ---------------------------------------------------------------------------
 // Pokédex entries
 // ---------------------------------------------------------------------------
-
-// Flavor text comes with hard line breaks (\n) and page breaks (\f) from the games
-function cleanFlavorText(text) {
-  return text
-    .replace(/­\n/g, '')        // soft hyphen at line break
-    .replace(/[\n\f\r]/g, ' ')
-    .replace(/POKéMON/g, 'Pokémon')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 // Censor the Pokémon's own name so the entry doesn't give it away
 function redactName(text, species) {
@@ -150,21 +104,9 @@ function redactName(text, species) {
 }
 
 async function loadEntries(species, dateKey) {
-  const res = await fetch(`${API}/pokemon-species/${species.id}`);
-  if (!res.ok) throw new Error(`species ${species.id}: HTTP ${res.status}`);
-  const data = await res.json();
-
-  // English entries, cleaned and de-duplicated (many versions reuse the same text)
-  const seen = new Set();
-  const unique = [];
-  for (const e of data.flavor_text_entries) {
-    if (e.language.name !== 'en') continue;
-    const text = cleanFlavorText(e.flavor_text);
-    const key = searchKey(text);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(text);
-  }
+  const res = await fetch(`data/entries/${species.id}.json`);
+  if (!res.ok) throw new Error(`entries ${species.id}: HTTP ${res.status}`);
+  const unique = await res.json();
 
   // Deterministically shuffle so the 3 shown entries vary day to day but are
   // identical for every player on a given day
@@ -259,7 +201,7 @@ function renderResult() {
   $('result').hidden = !done;
   if (!done) return;
 
-  $('result-sprite').src = ARTWORK_URL(state.daily.id);
+  $('result-sprite').src = SPRITE_URL(state.daily.id);
   $('result-sprite').alt = state.daily.name;
   if (state.status === 'won') {
     const n = state.guesses.length;
