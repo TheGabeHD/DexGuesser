@@ -84,10 +84,10 @@ async function loadSpeciesList() {
 // Pokédex entries
 // ---------------------------------------------------------------------------
 
-// Censor the Pokémon's own name so the entry doesn't give it away. "Mega" and
-// "Primal" stay visible ("Mega Evolution" is a legitimate part of the hint —
-// the player still has to figure out which Mega it is).
-const REDACT_KEEP = new Set(['mega', 'primal']);
+// Censor the Pokémon's own name so the entry doesn't give it away. Form words
+// like "Mega" stay visible ("Mega Evolution" is a legitimate part of the
+// hint — the player still has to figure out which Mega it is).
+const REDACT_KEEP = new Set(['mega', 'primal', 'gigantamax', 'gmax', 'style']);
 
 function redactName(text, species) {
   const tokens = new Set([species.name, species.slug]);

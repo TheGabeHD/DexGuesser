@@ -23,8 +23,9 @@ All Pokémon data is baked into the repo so the live site makes **zero**
 calls to external APIs:
 
 - `data/species.json` — id, slug, and display name for every guessable
-  Pokémon (powers the autocomplete). Mega/Primal forms are included and
-  carry their base Pokémon's national dex number in `dex`.
+  Pokémon (powers the autocomplete). Mega, Primal, and Gigantamax forms
+  are included and carry their base Pokémon's national dex number in
+  `dex`.
 - `data/entries/{id}.json` — cleaned, de-duplicated English Pokédex
   entries per Pokémon
 - `sprites/{id}.png` — icon for every Pokémon (from the
@@ -32,10 +33,14 @@ calls to external APIs:
   Mega Zygarde has no upstream sprite yet, so `10301.png` is a copy of
   the base Zygarde icon — replace it when upstream adds one.
 
-Base-species entries come from [PokéAPI](https://pokeapi.co). Mega and
-Primal forms have their own in-game entries (Sun/Moon, Let's Go, and
-Legends: Z-A) that PokéAPI doesn't carry, so those are parsed from each
-Pokémon's [Bulbapedia](https://bulbapedia.bulbagarden.net) page.
+Base-species entries come from [PokéAPI](https://pokeapi.co). Mega,
+Primal, and Gigantamax forms have their own in-game entries (Sun/Moon,
+Let's Go, Sword/Shield, and Legends: Z-A) that PokéAPI doesn't carry,
+so those are parsed from each Pokémon's
+[Bulbapedia](https://bulbapedia.bulbagarden.net) page. Forms that share
+entries are combined (e.g. Gigantamax Toxtricity's two modes); forms
+with distinct entries are separate answers (e.g. Gigantamax Urshifu's
+two styles).
 
 To refresh the JSON data (e.g. when a new generation is released):
 

@@ -221,67 +221,92 @@ function baseOf(formSlug) {
   return null;
 }
 
-// The label Bulbapedia uses for this form, e.g. "Mega Charizard X".
-// Middle tokens like male/curly/original are cosmetic sub-variants that share
-// one set of entries, so they collapse onto the same label.
-function bulbaLabel(formSlug, base) {
-  if (formSlug.endsWith('-primal')) return `Primal ${base.name}`;
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Display name for the form plus the {{Dex/Form|...}} labels Bulbapedia might
+// use for it, in order of preference. Middle slug tokens like male/curly/
+// original are cosmetic sub-variants that share one set of entries; they
+// resolve to the same display name and collapse below. Urshifu's two styles
+// have distinct Gigantamax entries and stay separate via the style label.
+function formMeta(formSlug, base) {
+  if (formSlug.endsWith('-primal')) {
+    return { name: `Primal ${base.name}`,
+             labels: [`Primal ${base.name}`, 'Primal Reversion'] };
+  }
+  if (formSlug.endsWith('-gmax')) {
+    // Tokens between the base slug and '-gmax', e.g. 'single-strike' or ''
+    const mid = formSlug.slice(base.slug.length + 1, -5);
+    const labels = [];
+    if (mid) labels.push(`${mid.split('-').map(cap).join(' ')} Style / Gigantamax`);
+    labels.push(`Gigantamax ${base.name}`, 'Gigantamax');
+    return { name: `Gigantamax ${base.name}`, labels };
+  }
   const suffix = formSlug.match(/-mega-([a-z])$/);
-  return `Mega ${base.name}${suffix ? ' ' + suffix[1].toUpperCase() : ''}`;
+  const name = `Mega ${base.name}${suffix ? ' ' + suffix[1].toUpperCase() : ''}`;
+  return { name, labels: [name] };
 }
 
 const forms = pokemonList.results
-  .filter(p => /-mega(-[a-z]+)?$|-primal$/.test(p.name))
+  .filter(p => /-mega(-[a-z]+)?$|-primal$|-gmax$/.test(p.name))
   .map(p => ({ slug: p.name, id: Number(p.url.match(/\/(\d+)\/?$/)[1]) }))
   .sort((a, b) => a.id - b.id);
-
-// label -> { id, slug, base }; first (lowest id) form wins for shared labels
-const megas = new Map();
+const known = [];
 for (const f of forms) {
-  const base = baseOf(f.slug);
-  if (!base) { console.log(`WARNING - no base species for form ${f.slug}`); continue; }
-  const label = bulbaLabel(f.slug, base);
-  if (!megas.has(label)) megas.set(label, { ...f, base });
+  f.base = baseOf(f.slug);
+  if (f.base) known.push(f);
+  else console.log(`WARNING - no base species for form ${f.slug}`);
 }
-console.log(`mega/primal forms: ${forms.length} -> ${megas.size} distinct`);
+console.log(`special forms: ${known.length}`);
 
 // Fetch each involved base species' Bulbapedia page (cached; polite concurrency)
-const megaBases = [...new Map([...megas.values()].map(m => [m.base.slug, m.base])).values()];
+const formBases = [...new Map(known.map(f => [f.base.slug, f.base])).values()];
 const wikitexts = new Map();
-await pool(megaBases, async base => {
+await pool(formBases, async base => {
   const title = base.name.replace(/ /g, '_') + '_(Pokémon)';
   const text = await cached(
     `bulbapedia/${base.slug}.wiki`, `${BULBA}?title=${encodeURIComponent(title)}&action=raw`);
   wikitexts.set(base.slug, text);
 }, 2);
-console.log(`bulbapedia pages: ${megaBases.length}`);
+console.log(`bulbapedia pages: ${formBases.length}`);
 
-const megaSpecies = [];
+const formSpecies = [];
+const taken = new Set();
 const unmatched = [];
-for (const [label, form] of megas) {
+for (const form of known) {
   const byForm = parseDexEntries(wikitexts.get(form.base.slug));
-  let texts = byForm.get(label) ?? [];
-  // Kyogre/Groudon label their section "Primal Reversion"
-  if (!texts.length && form.slug.endsWith('-primal')) {
-    texts = byForm.get('Primal Reversion') ?? [];
-  }
-  // Sub-form variants like "Mega Tatsugiri (Curly Form)" share one Pokémon
-  if (!texts.length) {
-    texts = [...byForm.entries()]
-      .filter(([k]) => k.startsWith(label + ' ('))
-      .flatMap(([, v]) => v);
+  const meta = formMeta(form.slug, form.base);
+  let name = meta.name;
+  let texts = [];
+  for (const label of meta.labels) {
+    texts = byForm.get(label) ?? [];
+    // Sub-form variants like "Mega Tatsugiri (Curly Form)" share one Pokémon
+    if (!texts.length) {
+      texts = [...byForm.entries()]
+        .filter(([k]) => k.startsWith(label + ' ('))
+        .flatMap(([, v]) => v);
+    }
+    if (texts.length) {
+      // A style-specific match like "Single Strike Style / Gigantamax" means
+      // this style is its own Pokémon with its own entries
+      if (label.includes(' / Gigantamax')) {
+        name = `Gigantamax ${form.base.name} (${label.split(' / ')[0]})`;
+      }
+      break;
+    }
   }
   const entries = dedupe(texts);
   if (entries.length === 0) {
-    unmatched.push(`${label} (forms on page: ${[...byForm.keys()].filter(Boolean).join(', ') || 'none'})`);
+    unmatched.push(`${form.slug} (forms on page: ${[...byForm.keys()].filter(Boolean).join(', ') || 'none'})`);
     continue;
   }
+  if (taken.has(name)) continue; // e.g. both Toxtricity modes share one Gigantamax
+  taken.add(name);
   await writeFile(
     path.join(ROOT, 'data', 'entries', `${form.id}.json`), JSON.stringify(entries));
-  megaSpecies.push({ id: form.id, slug: form.slug, name: label, dex: form.base.id });
+  formSpecies.push({ id: form.id, slug: form.slug, name, dex: form.base.id });
 }
-megaSpecies.sort((a, b) => a.dex - b.dex || a.id - b.id);
-console.log(`mega/primal with entries: ${megaSpecies.length}`);
+formSpecies.sort((a, b) => a.dex - b.dex || a.id - b.id);
+console.log(`special forms with entries: ${formSpecies.length}`);
 if (unmatched.length) {
   console.log(`WARNING - no Bulbapedia entries matched for ${unmatched.length} forms:`);
   for (const u of unmatched) console.log(`  ${u}`);
@@ -293,6 +318,6 @@ if (unmatched.length) {
 
 await writeFile(
   path.join(ROOT, 'data', 'species.json'),
-  JSON.stringify([...species, ...megaSpecies]));
-console.log(`species.json: ${species.length} base + ${megaSpecies.length} mega/primal`);
+  JSON.stringify([...species, ...formSpecies]));
+console.log(`species.json: ${species.length} base + ${formSpecies.length} special forms`);
 console.log(`network requests this run: ${fetched}`);
