@@ -64,26 +64,6 @@ main {
   padding: 0;
 }
 
-/* --- Guess dots ------------------------------------------------------- */
-
-#guess-dots {
-  display: flex;
-  justify-content: center;
-  gap: 0.6rem;
-  margin-bottom: 1rem;
-}
-
-.dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--card);
-  border: 2px solid var(--muted);
-}
-
-.dot.used { background: var(--accent); border-color: var(--accent); }
-.dot.won { background: var(--green); border-color: var(--green); }
-
 /* --- Pokédex entries --------------------------------------------------- */
 
 .entry {
@@ -182,6 +162,13 @@ main {
 #suggestions li.highlighted,
 #suggestions li:hover {
   background: var(--card-border);
+}
+
+#attempts-remaining {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0.75rem 0 0;
 }
 
 /* --- Guess history ------------------------------------------------------ */

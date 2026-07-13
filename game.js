@@ -159,20 +159,16 @@ const $ = id => document.getElementById(id);
 const dexNo = sp => String(sp.dex ?? sp.id).padStart(4, '0');
 
 function render() {
-  renderDots();
+  renderAttempts();
   renderEntries();
   renderHistory();
   renderResult();
 }
 
-function renderDots() {
-  const dots = [];
-  for (let i = 0; i < MAX_GUESSES; i++) {
-    const used = i < state.guesses.length && !(state.status === 'won' && i === state.guesses.length - 1);
-    const won = state.status === 'won' && i === state.guesses.length - 1;
-    dots.push(`<span class="dot ${won ? 'won' : used ? 'used' : ''}"></span>`);
-  }
-  $('guess-dots').innerHTML = dots.join('');
+function renderAttempts() {
+  const el = $('attempts-remaining');
+  el.hidden = state.status !== 'playing';
+  el.textContent = `Attempts remaining: ${MAX_GUESSES - state.guesses.length}`;
 }
 
 function renderEntries() {
