@@ -105,7 +105,7 @@ function redactName(text, species) {
   let out = text;
   for (const token of sorted) {
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp(escaped, 'gi'), '███');
+    out = out.replace(new RegExp(escaped, 'gi'), '_____');
   }
   return out;
 }
