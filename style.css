@@ -86,6 +86,9 @@ main {
   margin-bottom: 0.3rem;
 }
 
+.entry.muted { color: var(--muted); }
+.entry.muted .entry-label { color: var(--muted); }
+
 .entry.no-entry {
   border-left-color: var(--muted);
   color: var(--muted);

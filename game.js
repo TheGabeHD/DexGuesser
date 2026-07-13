@@ -193,6 +193,17 @@ function renderEntries() {
       </div>`
     );
   }
+  // Won early: show the entries they never needed, muted
+  if (state.status === 'won') {
+    for (let i = revealed; i < state.entries.length; i++) {
+      html.push(
+        `<div class="entry muted">
+          <div class="entry-label">Entry ${i + 1}</div>
+          <p>${state.entries[i]}</p>
+        </div>`
+      );
+    }
+  }
   $('entries').innerHTML = html.join('');
 }
 
