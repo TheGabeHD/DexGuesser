@@ -243,7 +243,7 @@ function shareText() {
   const result = state.status === 'won'
     ? `✅ I got it in ${n} ${n === 1 ? 'guess' : 'guesses'}!`
     : '❌ I ran out of guesses!';
-  return `\u{1F50D} DexGuesser #${puzzleNumber()}\n\n"${state.entries[0]}"\n\n${result}`;
+  return `\u{1F50D} DexGuesser #${puzzleNumber()}\n"${state.entries[0]}"\n${result}`;
 }
 
 function isMobile() {
