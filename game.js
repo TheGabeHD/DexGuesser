@@ -172,37 +172,23 @@ function renderAttempts() {
 }
 
 function renderEntries() {
+  // Three slots, one per guess; a slot shows its entry, or a placeholder if
+  // the Pokémon has fewer entries than guesses. All slots appear once the
+  // game ends; slots the winner never needed render muted.
   const wrongCount = state.status === 'won' ? state.guesses.length - 1 : state.guesses.length;
-  const revealed = state.status === 'lost'
-    ? state.entries.length
-    : Math.min(wrongCount + 1, state.entries.length);
+  const seen = Math.min(wrongCount + 1, MAX_GUESSES);
+  const revealed = state.status === 'playing' ? seen : MAX_GUESSES;
 
   const html = [];
   for (let i = 0; i < revealed; i++) {
+    const noEntry = i >= state.entries.length;
+    const classes = 'entry' + (noEntry ? ' no-entry' : '') + (i >= seen ? ' muted' : '');
     html.push(
-      `<div class="entry">
+      `<div class="${classes}">
         <div class="entry-label">Entry ${i + 1}</div>
-        <p>${state.entries[i]}</p>
+        <p>${noEntry ? 'No more entries exist for this Pokémon.' : state.entries[i]}</p>
       </div>`
     );
-  }
-  if (state.status === 'playing' && wrongCount + 1 > state.entries.length) {
-    html.push(
-      `<div class="entry no-entry">
-        <p>No more entries exist for this Pokémon.</p>
-      </div>`
-    );
-  }
-  // Won early: show the entries they never needed, muted
-  if (state.status === 'won') {
-    for (let i = revealed; i < state.entries.length; i++) {
-      html.push(
-        `<div class="entry muted">
-          <div class="entry-label">Entry ${i + 1}</div>
-          <p>${state.entries[i]}</p>
-        </div>`
-      );
-    }
   }
   $('entries').innerHTML = html.join('');
 }
