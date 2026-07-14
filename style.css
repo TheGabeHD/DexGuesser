@@ -90,9 +90,7 @@ main {
 .entry.muted .entry-label { color: var(--muted); }
 
 .entry.no-entry {
-  border-left-color: var(--muted);
   color: var(--muted);
-  font-style: italic;
 }
 
 @keyframes fade-in {
