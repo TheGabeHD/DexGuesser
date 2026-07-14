@@ -229,12 +229,21 @@ function renderResult() {
 // Sharing
 // ---------------------------------------------------------------------------
 
+// Puzzle #1 was July 9, 2026; local midnights + rounding so DST can't skew it
+const FIRST_PUZZLE = new Date(2026, 6, 9);
+
+function puzzleNumber() {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((today - FIRST_PUZZLE) / 86400000) + 1;
+}
+
 function shareText() {
   const n = state.guesses.length;
   const result = state.status === 'won'
-    ? `I got it in ${n} ${n === 1 ? 'guess' : 'guesses'}!`
-    : 'I ran out of guesses!';
-  return `\u{1F50D} Today's DexGuesser:\n"${state.entries[0]}"\n\n${result}`;
+    ? `✅ I got it in ${n} ${n === 1 ? 'guess' : 'guesses'}!`
+    : '❌ I ran out of guesses!';
+  return `\u{1F50D} DexGuesser #${puzzleNumber()}\n\n"${state.entries[0]}"\n\n${result}`;
 }
 
 function isMobile() {
