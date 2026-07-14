@@ -226,6 +226,36 @@ function renderResult() {
 }
 
 // ---------------------------------------------------------------------------
+// Sharing
+// ---------------------------------------------------------------------------
+
+function shareText() {
+  const n = state.guesses.length;
+  const result = state.status === 'won'
+    ? `I got it in ${n} ${n === 1 ? 'guess' : 'guesses'}!`
+    : 'I ran out of guesses!';
+  return `\u{1F50D} Today's DexGuesser:\n"${state.entries[0]}"\n\n${result}`;
+}
+
+function isMobile() {
+  return navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+async function shareResult() {
+  const text = shareText();
+
+  if (isMobile() && navigator.share) {
+    try { await navigator.share({ text }); } catch { /* user cancelled */ }
+    return;
+  }
+
+  await navigator.clipboard.writeText(text);
+  const label = $('share-label');
+  label.textContent = 'Copied!';
+  setTimeout(() => { label.textContent = 'Share Results'; }, 1500);
+}
+
+// ---------------------------------------------------------------------------
 // Countdown to the next daily Pokémon (local midnight)
 // ---------------------------------------------------------------------------
 
@@ -355,6 +385,8 @@ function setupEvents() {
   document.addEventListener('click', e => {
     if (!e.target.closest('.input-wrap')) closeSuggestions();
   });
+
+  $('share').addEventListener('click', shareResult);
 
   $('retry').addEventListener('click', init);
 }

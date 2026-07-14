@@ -214,6 +214,23 @@ main {
 
 #result .dexno { color: var(--muted); }
 
+#share {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 1rem;
+  padding: 0.55rem 1.8rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+#share:hover { filter: brightness(1.1); }
+
 #countdown {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
