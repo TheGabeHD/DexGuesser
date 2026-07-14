@@ -165,13 +165,6 @@ main {
   background: var(--card-border);
 }
 
-#attempts-remaining {
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.95rem;
-  margin: 0.75rem 0 0;
-}
-
 /* --- Guess history ------------------------------------------------------ */
 
 #guess-history {
@@ -191,6 +184,12 @@ main {
 
 .chip.wrong { background: rgba(239, 83, 80, 0.15); color: var(--accent); }
 .chip.correct { background: rgba(76, 175, 125, 0.15); color: var(--green); }
+
+.chip.empty {
+  min-width: 6.5rem;
+  min-height: 1.9rem;
+  background: var(--card);
+}
 
 /* --- Result panel ------------------------------------------------------- */
 

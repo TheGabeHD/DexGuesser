@@ -159,16 +159,9 @@ const $ = id => document.getElementById(id);
 const dexNo = sp => String(sp.dex ?? sp.id).padStart(4, '0');
 
 function render() {
-  renderAttempts();
   renderEntries();
   renderHistory();
   renderResult();
-}
-
-function renderAttempts() {
-  const el = $('attempts-remaining');
-  el.hidden = state.status !== 'playing';
-  el.textContent = `Attempts remaining: ${MAX_GUESSES - state.guesses.length}`;
 }
 
 function renderEntries() {
@@ -194,13 +187,21 @@ function renderEntries() {
 }
 
 function renderHistory() {
-  $('guess-history').innerHTML = state.guesses.map(id => {
+  // One slot per guess; empty slots fill in as the player guesses
+  const slots = [];
+  for (let i = 0; i < MAX_GUESSES; i++) {
+    if (i >= state.guesses.length) {
+      slots.push('<span class="chip empty"></span>');
+      continue;
+    }
+    const id = state.guesses[i];
     const sp = state.species.find(s => s.id === id);
     const correct = id === state.daily.id;
-    return `<span class="chip ${correct ? 'correct' : 'wrong'}">
+    slots.push(`<span class="chip ${correct ? 'correct' : 'wrong'}">
       ${correct ? '✓' : '✕'} ${sp ? sp.name : '?'}
-    </span>`;
-  }).join('');
+    </span>`);
+  }
+  $('guess-history').innerHTML = slots.join('');
 }
 
 function renderResult() {
