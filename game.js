@@ -354,6 +354,20 @@ function submitGuess(species) {
   closeSuggestions();
   $('guess-input').value = '';
   render();
+
+  // Bring the result panel into view when this guess ended the game (here
+  // rather than in render(), so restoring a finished game doesn't scroll)
+  if (state.status !== 'playing') scrollToResult();
+}
+
+// Center the result — including the New Game button, which sits below the
+// panel in endless mode — in the viewport; align its top if it doesn't fit
+function scrollToResult() {
+  const top = $('result').getBoundingClientRect().top;
+  const bottomEl = state.mode === 'endless' ? $('next') : $('result');
+  const height = bottomEl.getBoundingClientRect().bottom - top;
+  const lead = height < window.innerHeight ? (window.innerHeight - height) / 2 : 0;
+  window.scrollTo({ top: window.scrollY + top - lead, behavior: 'smooth' });
 }
 
 function flashInput() {
