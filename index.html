@@ -14,7 +14,12 @@
   </header>
 
   <main>
-    <div id="loading">Loading today's Pok&eacute;mon&hellip;</div>
+    <div id="mode-toggle" role="group" aria-label="Game mode">
+      <button id="mode-daily" type="button" class="active">Daily</button>
+      <button id="mode-endless" type="button">Endless</button>
+    </div>
+
+    <div id="loading">Loading Pok&eacute;mon&hellip;</div>
 
     <div id="game" hidden>
       <div id="entries"></div>
@@ -41,6 +46,13 @@
           </svg>
         </button>
       </div>
+
+      <button id="next" type="button" hidden>
+        New Game
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.74 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+      </button>
     </div>
 
     <div id="error" hidden>

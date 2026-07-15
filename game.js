@@ -12,6 +12,7 @@ const MAX_GUESSES = 3;
 const MAX_SUGGESTIONS = 8;
 
 const STORAGE_PROGRESS = 'dexguesser-progress-v1';
+const STORAGE_ENDLESS = 'dexguesser-endless-v1';
 
 // ---------------------------------------------------------------------------
 // Game state
@@ -19,7 +20,9 @@ const STORAGE_PROGRESS = 'dexguesser-progress-v1';
 
 const state = {
   species: [],      // [{ id, slug, name, searchKey }]
-  daily: null,      // today's species object
+  mode: 'daily',    // 'daily' | 'endless'
+  answer: null,     // the species to guess
+  entrySeed: null,  // entries shuffle seed for the current endless game
   entries: [],      // up to 3 redacted pokedex entries
   guesses: [],      // species ids guessed so far (wrong ones + possibly the winner)
   status: 'playing' // 'playing' | 'won' | 'lost'
@@ -59,6 +62,10 @@ function mulberry32(seed) {
 function pickDaily(speciesList, dateKey) {
   const rng = mulberry32(hashString('dexguesser:' + dateKey));
   return speciesList[Math.floor(rng() * speciesList.length)];
+}
+
+function pickRandom(speciesList) {
+  return speciesList[Math.floor(Math.random() * speciesList.length)];
 }
 
 // ---------------------------------------------------------------------------
@@ -110,14 +117,14 @@ function redactName(text, species) {
   return out;
 }
 
-async function loadEntries(species, dateKey) {
+async function loadEntries(species, seedKey) {
   const res = await fetch(`data/entries/${species.id}.json`);
   if (!res.ok) throw new Error(`entries ${species.id}: HTTP ${res.status}`);
   const unique = await res.json();
 
-  // Deterministically shuffle so the 3 shown entries vary day to day but are
-  // identical for every player on a given day
-  const rng = mulberry32(hashString('entries:' + dateKey));
+  // Seeded shuffle: in daily mode the seed is the date, so the 3 shown entries
+  // vary day to day but are identical for every player on a given day
+  const rng = mulberry32(hashString('entries:' + seedKey));
   for (let i = unique.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [unique[i], unique[j]] = [unique[j], unique[i]];
@@ -131,11 +138,22 @@ async function loadEntries(species, dateKey) {
 // ---------------------------------------------------------------------------
 
 function saveProgress() {
-  localStorage.setItem(STORAGE_PROGRESS, JSON.stringify({
-    date: todayKey(),
-    guesses: state.guesses,
-    status: state.status,
-  }));
+  if (state.mode === 'daily') {
+    localStorage.setItem(STORAGE_PROGRESS, JSON.stringify({
+      date: todayKey(),
+      guesses: state.guesses,
+      status: state.status,
+    }));
+  } else {
+    // The endless pick isn't derivable from the date, so the answer and the
+    // entry-shuffle seed are saved along with the progress
+    localStorage.setItem(STORAGE_ENDLESS, JSON.stringify({
+      answerId: state.answer.id,
+      seed: state.entrySeed,
+      guesses: state.guesses,
+      status: state.status,
+    }));
+  }
 }
 
 function restoreProgress() {
@@ -146,6 +164,19 @@ function restoreProgress() {
       state.status = saved.status;
     }
   } catch { /* corrupt storage -> start fresh */ }
+}
+
+// Returns the saved endless game, or null if there is none (or its answer no
+// longer exists in the species pool)
+function savedEndlessGame() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_ENDLESS));
+    const answer = saved && state.species.find(s => s.id === saved.answerId);
+    if (answer && typeof saved.seed === 'string') {
+      return { answer, seed: saved.seed, guesses: saved.guesses, status: saved.status };
+    }
+  } catch { /* corrupt storage -> start fresh */ }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +193,9 @@ function render() {
   renderEntries();
   renderHistory();
   renderResult();
+  // In endless mode "New Game" is always available (mid-game it abandons the
+  // current Pokémon and rolls a new one)
+  $('next').hidden = state.mode !== 'endless';
 }
 
 function renderEntries() {
@@ -196,7 +230,7 @@ function renderHistory() {
     }
     const id = state.guesses[i];
     const sp = state.species.find(s => s.id === id);
-    const correct = id === state.daily.id;
+    const correct = id === state.answer.id;
     slots.push(`<span class="chip ${correct ? 'correct' : 'wrong'}">
       ${correct ? '✓' : '✕'} ${sp ? sp.name : '?'}
     </span>`);
@@ -210,8 +244,8 @@ function renderResult() {
   $('result').hidden = !done;
   if (!done) return;
 
-  $('result-sprite').src = SPRITE_URL(state.daily.id);
-  $('result-sprite').alt = state.daily.name;
+  $('result-sprite').src = SPRITE_URL(state.answer.id);
+  $('result-sprite').alt = state.answer.name;
   if (state.status === 'won') {
     const n = state.guesses.length;
     $('result-title').textContent = `You got it in ${n} ${n === 1 ? 'guess' : 'guesses'}!`;
@@ -221,8 +255,13 @@ function renderResult() {
     $('result-title').className = 'lose';
   }
   $('result-answer').innerHTML =
-    `It was <strong>${state.daily.name}</strong> <span class="dexno">#${dexNo(state.daily)}</span>`;
-  startCountdown();
+    `It was <strong>${state.answer.name}</strong> <span class="dexno">#${dexNo(state.answer)}</span>`;
+
+  // Only daily games are shareable and count down to the next puzzle
+  const daily = state.mode === 'daily';
+  $('share').hidden = !daily;
+  $('countdown').hidden = !daily;
+  if (daily) startCountdown();
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +326,12 @@ function startCountdown() {
   countdownTimer = setInterval(tick, 1000);
 }
 
+function stopCountdown() {
+  if (!countdownTimer) return;
+  clearInterval(countdownTimer);
+  countdownTimer = null;
+}
+
 // ---------------------------------------------------------------------------
 // Guessing
 // ---------------------------------------------------------------------------
@@ -299,7 +344,7 @@ function submitGuess(species) {
   }
 
   state.guesses.push(species.id);
-  if (species.id === state.daily.id) {
+  if (species.id === state.answer.id) {
     state.status = 'won';
   } else if (state.guesses.length >= MAX_GUESSES) {
     state.status = 'lost';
@@ -397,7 +442,66 @@ function setupEvents() {
 
   $('share').addEventListener('click', shareResult);
 
+  $('next').addEventListener('click', newEndlessGame);
+
+  $('mode-daily').addEventListener('click', () => setMode('daily'));
+  $('mode-endless').addEventListener('click', () => setMode('endless'));
+
   $('retry').addEventListener('click', init);
+}
+
+function setMode(mode) {
+  if (state.mode === mode || !state.species.length) return;
+  state.mode = mode;
+  $('mode-daily').classList.toggle('active', mode === 'daily');
+  $('mode-endless').classList.toggle('active', mode === 'endless');
+  startGame();
+}
+
+function newEndlessGame() {
+  localStorage.removeItem(STORAGE_ENDLESS);
+  startGame();
+}
+
+// Start (or restart) a game in the current mode. Both modes persist, so
+// switching away and back (or reloading) restores the game where it was.
+async function startGame() {
+  $('error').hidden = true;
+  $('loading').hidden = false;
+  $('game').hidden = true;
+  stopCountdown();
+  state.guesses = [];
+  state.status = 'playing';
+
+  try {
+    if (state.mode === 'daily') {
+      state.answer = pickDaily(state.species, todayKey());
+      state.entries = await loadEntries(state.answer, todayKey());
+      restoreProgress();
+    } else {
+      const saved = savedEndlessGame();
+      state.answer = saved ? saved.answer : pickRandom(state.species);
+      state.entrySeed = saved ? saved.seed : String(Math.random());
+      state.entries = await loadEntries(state.answer, state.entrySeed);
+      if (saved) {
+        state.guesses = saved.guesses;
+        state.status = saved.status;
+      } else {
+        saveProgress(); // pin the fresh pick so a reload can't reroll it
+      }
+    }
+
+    $('loading').hidden = true;
+    $('game').hidden = false;
+    $('guess-input').value = '';
+    closeSuggestions();
+    render();
+    if (state.status === 'playing') $('guess-input').focus();
+  } catch (err) {
+    console.error(err);
+    $('loading').hidden = true;
+    $('error').hidden = false;
+  }
 }
 
 async function init() {
@@ -407,19 +511,13 @@ async function init() {
 
   try {
     state.species = await loadSpeciesList();
-    state.daily = pickDaily(state.species, todayKey());
-    state.entries = await loadEntries(state.daily, todayKey());
-    restoreProgress();
-
-    $('loading').hidden = true;
-    $('game').hidden = false;
-    render();
-    if (state.status === 'playing') $('guess-input').focus();
   } catch (err) {
     console.error(err);
     $('loading').hidden = true;
     $('error').hidden = false;
+    return;
   }
+  await startGame();
 }
 
 setupEvents();
