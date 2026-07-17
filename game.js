@@ -92,23 +92,14 @@ async function loadSpeciesList() {
 // Pokédex entries
 // ---------------------------------------------------------------------------
 
-// Censor the Pokémon's own name so the entry doesn't give it away. Form words
-// like "Mega" or "Alolan" stay visible ("Mega Evolution" is a legitimate part
-// of the hint — the player still has to figure out which Mega it is).
-const REDACT_KEEP = new Set([
-  'mega', 'primal', 'gigantamax', 'gmax', 'style', 'breed', 'mode', 'standard', 'zen',
-  'alolan', 'alola', 'galarian', 'galar', 'hisuian', 'hisui', 'paldean', 'paldea',
-  'form', 'forme', 'size', 'face', 'mask', 'rider', 'build', 'cloak', 'plumage',
-  'family', 'color', 'segment', 'striped', 'flower',
-]);
-
+// Censor the Pokémon's species name (`base`: "Rotom" for Wash Rotom) so the
+// entry doesn't give it away. Only the name itself is hidden — form words
+// ("Wash", "Cornerstone", "Mega") are ordinary descriptions and stay visible.
 function redactName(text, species) {
-  const tokens = new Set([species.name, species.id]);
-  for (const part of species.name.split(/[\s\-.()]+/)) {
-    if (part.length >= 3 && !REDACT_KEEP.has(part.toLowerCase())) tokens.add(part);
-  }
-  for (const part of species.id.split('-')) {
-    if (part.length >= 3 && !REDACT_KEEP.has(part)) tokens.add(part);
+  const base = species.base ?? species.name;
+  const tokens = new Set([base]);
+  for (const part of base.split(/[^\p{L}\p{N}]+/u)) {
+    if (part.length >= 3) tokens.add(part);
   }
   // Longest first so "Mr. Mime" is redacted before "Mime"
   const sorted = [...tokens].sort((a, b) => b.length - a.length);

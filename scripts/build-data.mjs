@@ -12,14 +12,16 @@
 //   - every species is one answer
 //   - Mega / Primal / Gigantamax / regional (Alolan/Galarian/Hisuian/Paldean)
 //     forms are separate answers, ONE per name (sub-variants pool together:
-//     one Gigantamax Urshifu, one Mega Tatsugiri, one Paldean Tauros)
+//     one Mega Tatsugiri, one Paldean Tauros) — unless an explicit ALT_FORMS
+//     row overrides that grouping (Gigantamax Urshifu's two styles)
 //   - every other form's entries merge into the species' base answer, unless
 //     its ALT_FORMS row below is flipped to separate: true
 //   - everything Bulbapedia files under "Pokédex entries" counts (Stadium,
 //     Pokopia, ...); multi-game Stadium 2 lines are split into their parts
 //
 // Outputs:
-//   data/species.json        - [{ id, name, dex }] (id is also the file key)
+//   data/species.json        - [{ id, name, base, dex }] (id is also the file
+//                              key; base is the species name, for redaction)
 //   data/entries/{id}.json   - unique, cleaned entries per answer
 //   data/artwork.json        - id -> candidate Bulbagarden Archives filenames
 //                              (consumed by scripts/fetch-artwork.mjs)
@@ -43,31 +45,51 @@ const RAW = path.join(ROOT, 'raw');
 // To promote a form: flip its flag, run this script, then
 // `node scripts/fetch-artwork.mjs` to download its image.
 // Rows with name: null are the default form / oddities (grouped cap labels,
-// Pokopia-only characters, gender notes) — they always merge; give one a name
-// and a separate flag if it should ever become an answer.
+// gender notes) — they always merge; give one a name and a separate flag if
+// it should ever become an answer.
+// Rows with drop: true are discarded entirely — not an answer, and their
+// entries don't join the base either (user decision, 2026-07: Pokopia's
+// pseudo-form characters like Mossy Snorlax read wrong on the base answer,
+// and Vivillon's 20 per-pattern entries would drown out its own).
+// Standard unlabeled Pokopia entries still merge into the base as usual.
+// A row with rename: true still merges into the base answer, but the base
+// answer displays that row's `name` (e.g. "Urshifu (Single Strike Style)")
+// so it reads unambiguously next to its promoted sibling forms. The answer id
+// stays the plain species slug, so entry/sprite files don't move.
 // Labels not listed here (and not Mega/Gmax/regional) also merge, with a
 // build note so new games' forms surface for review.
+// A row may also claim a Mega/Gmax/regional label to override the default
+// one-answer-per-name grouping (e.g. splitting Gigantamax Urshifu's styles
+// or Galarian Darmanitan's Zen Mode into their own answers).
+// A separate row may pin its artwork with art: '<archive filename>' when the
+// page scan can't find it (Busted Mimikyu only has a HOME render).
 // ---------------------------------------------------------------------------
 const ALT_FORMS = {
   pikachu: [
-    { name: null, labels: ['Original Cap', 'Partner Cap', 'World Cap', 'Pale',
+    { name: null, labels: ['Original Cap', 'Partner Cap', 'World Cap',
       'Original Cap, Hoenn Cap, Sinnoh Cap, Unova Cap, Kalos Cap, Alola Cap, and Partner Cap',
-      'Hoenn Cap, Sinnoh Cap, Unova Cap, Kalos Cap, and Alola Cap'] }, // costume caps + Pokopia's Pale
+      'Hoenn Cap, Sinnoh Cap, Unova Cap, Kalos Cap, and Alola Cap'] }, // costume caps
+    { labels: ['Pale'], drop: true }, // Pokopia character
+  ],
+  tauros: [
+    { name: 'Paldean Tauros (Combat Breed)', labels: ['Paldean Form (Combat Breed)'], separate: true },
+    { name: 'Paldean Tauros (Blaze Breed)', labels: ['Paldean Form (Blaze Breed)'], separate: true },
+    { name: 'Paldean Tauros (Aqua Breed)', labels: ['Paldean Form (Aqua Breed)'], separate: true },
   ],
   snorlax: [
-    { name: null, labels: ['Mossy'] }, // Pokopia's Mosslax
+    { labels: ['Mossy'], drop: true }, // Pokopia's Mosslax
   ],
   unown: [
     { name: null, labels: ['One form'] }, // BDSP label quirk
   ],
   smeargle: [
-    { name: null, labels: ['Decorator'] }, // Pokopia character
+    { labels: ['Decorator'], drop: true }, // Pokopia character
   ],
   castform: [
     { name: null, labels: ['Normal'] },
-    { name: 'Castform (Sunny Form)', labels: ['Sunny Form'], separate: false },
-    { name: 'Castform (Rainy Form)', labels: ['Rainy Form'], separate: false },
-    { name: 'Castform (Snowy Form)', labels: ['Snowy Form'], separate: false },
+    { name: 'Castform (Sunny Form)', labels: ['Sunny Form'], separate: true },
+    { name: 'Castform (Rainy Form)', labels: ['Rainy Form'], separate: true },
+    { name: 'Castform (Snowy Form)', labels: ['Snowy Form'], separate: true },
   ],
   deoxys: [
     { name: null, labels: ['Normal Forme'] },
@@ -98,15 +120,16 @@ const ALT_FORMS = {
     { name: 'Gastrodon (East Sea)', labels: ['East Sea'], separate: false },
   ],
   tangrowth: [
-    { name: null, labels: ['Professor'] }, // Pokopia character
+    { labels: ['Professor'], drop: true }, // Pokopia character
   ],
   rotom: [
-    { name: null, labels: ['Rotom', 'Stereo Rotom'] }, // base + Pokopia's stereo
-    { name: 'Heat Rotom', labels: ['Heat Rotom'], separate: false },
-    { name: 'Wash Rotom', labels: ['Wash Rotom'], separate: false },
-    { name: 'Frost Rotom', labels: ['Frost Rotom'], separate: false },
-    { name: 'Fan Rotom', labels: ['Fan Rotom'], separate: false },
-    { name: 'Mow Rotom', labels: ['Mow Rotom'], separate: false },
+    { name: null, labels: ['Rotom'] },
+    { name: 'Heat Rotom', labels: ['Heat Rotom'], separate: true },
+    { name: 'Wash Rotom', labels: ['Wash Rotom'], separate: true },
+    { name: 'Frost Rotom', labels: ['Frost Rotom'], separate: true },
+    { name: 'Fan Rotom', labels: ['Fan Rotom'], separate: true },
+    { name: 'Mow Rotom', labels: ['Mow Rotom'], separate: true },
+    { labels: ['Stereo Rotom'], drop: true }, // Pokopia character
   ],
   dialga: [
     { name: 'Dialga (Origin Forme)', labels: ['Origin Forme'], separate: false },
@@ -135,7 +158,9 @@ const ALT_FORMS = {
   ],
   darmanitan: [
     { name: null, labels: ['Standard Mode'] },
-    { name: 'Darmanitan (Zen Mode)', labels: ['Zen Mode'], separate: false },
+    { name: 'Darmanitan (Zen Mode)', labels: ['Zen Mode'], separate: true },
+    { name: 'Galarian Darmanitan', labels: ['Galarian Form'], separate: true },
+    { name: 'Galarian Darmanitan (Zen Mode)', labels: ['Galarian Form/Zen Mode'], separate: true },
   ],
   deerling: [
     { name: null, labels: ['Spring Form'] },
@@ -157,20 +182,20 @@ const ALT_FORMS = {
   ],
   tornadus: [
     { name: null, labels: ['Incarnate Forme'] },
-    { name: 'Tornadus (Therian Forme)', labels: ['Therian Forme'], separate: false },
+    { name: 'Tornadus (Therian Forme)', labels: ['Therian Forme'], separate: true },
   ],
   thundurus: [
     { name: null, labels: ['Incarnate Forme'] },
-    { name: 'Thundurus (Therian Forme)', labels: ['Therian Forme'], separate: false },
+    { name: 'Thundurus (Therian Forme)', labels: ['Therian Forme'], separate: true },
   ],
   landorus: [
     { name: null, labels: ['Incarnate Forme'] },
-    { name: 'Landorus (Therian Forme)', labels: ['Therian Forme'], separate: false },
+    { name: 'Landorus (Therian Forme)', labels: ['Therian Forme'], separate: true },
   ],
   kyurem: [
     { name: null, labels: ['Kyurem'] },
-    { name: 'White Kyurem', labels: ['White Kyurem'], separate: false },
-    { name: 'Black Kyurem', labels: ['Black Kyurem'], separate: false },
+    { name: 'White Kyurem', labels: ['White Kyurem'], separate: true },
+    { name: 'Black Kyurem', labels: ['Black Kyurem'], separate: true },
   ],
   keldeo: [
     { name: null, labels: ['Ordinary Form'] },
@@ -188,12 +213,12 @@ const ALT_FORMS = {
     { name: 'Genesect (Chill Drive)', labels: ['Chill Drive'], separate: false },
   ],
   vivillon: [
-    { name: null, labels: ['Icy Snow Pattern', 'Polar Pattern', 'Tundra Pattern',
+    { labels: ['Icy Snow Pattern', 'Polar Pattern', 'Tundra Pattern',
       'Continental Pattern', 'Garden Pattern', 'Elegant Pattern', 'Meadow Pattern',
       'Modern Pattern', 'Marine Pattern', 'Archipelago Pattern', 'High Plains Pattern',
       'Sandstorm Pattern', 'River Pattern', 'Monsoon Pattern', 'Savanna Pattern',
       'Sun Pattern', 'Ocean Pattern', 'Jungle Pattern', 'Fancy Pattern',
-      'Poké Ball Pattern'] }, // cosmetic wing patterns
+      'Poké Ball Pattern'], drop: true }, // per-pattern SV entries; keep only the base's
   ],
   flabebe: [
     { name: null, labels: ['Red Flower', 'Yellow Flower', 'Orange Flower',
@@ -202,7 +227,7 @@ const ALT_FORMS = {
   floette: [
     { name: null, labels: ['Red Flower', 'Yellow Flower', 'Orange Flower',
       'Blue Flower', 'White Flower'] },
-    { name: 'Floette (Eternal Flower)', labels: ['Eternal Flower'], separate: false },
+    { name: 'Floette (Eternal Flower)', labels: ['Eternal Flower'], separate: true },
   ],
   florges: [
     { name: null, labels: ['Red Flower', 'Yellow Flower', 'Orange Flower',
@@ -213,8 +238,8 @@ const ALT_FORMS = {
     { name: 'Meowstic (Female)', labels: ['Female'], separate: false },
   ],
   aegislash: [
-    { name: null, labels: ['Shield Forme'] },
-    { name: 'Aegislash (Blade Forme)', labels: ['Blade Forme'], separate: false },
+    { name: 'Aegislash (Shield Forme)', labels: ['Shield Forme'], rename: true },
+    { name: 'Aegislash (Blade Forme)', labels: ['Blade Forme'], separate: true },
   ],
   pumpkaboo: [
     { name: null, labels: ['Average Size', 'Medium Variety'] },
@@ -229,24 +254,24 @@ const ALT_FORMS = {
     { name: 'Gourgeist (Super Size)', labels: ['Super Size', 'Jumbo Variety'], separate: false },
   ],
   zygarde: [
-    { name: null, labels: ['50% Forme'] },
-    { name: 'Zygarde (10% Forme)', labels: ['10% Forme'], separate: false },
-    { name: 'Zygarde (Complete Forme)', labels: ['Complete Forme'], separate: false },
+    { name: null, labels: ['50% Forme'] }, // 50% is the default answer
+    { name: 'Zygarde (10% Forme)', labels: ['10% Forme'], separate: true },
+    { name: 'Zygarde (Complete Forme)', labels: ['Complete Forme'], separate: true },
   ],
   hoopa: [
     { name: null, labels: ['Hoopa Confined'] },
-    { name: 'Hoopa Unbound', labels: ['Hoopa Unbound'], separate: false },
+    { name: 'Hoopa Unbound', labels: ['Hoopa Unbound'], separate: true },
   ],
   oricorio: [
-    { name: null, labels: ['Baile Style'] },
-    { name: 'Oricorio (Pom-Pom Style)', labels: ['Pom-Pom Style'], separate: false },
-    { name: "Oricorio (Pa'u Style)", labels: ["Pa'u Style"], separate: false },
-    { name: 'Oricorio (Sensu Style)', labels: ['Sensu Style'], separate: false },
+    { name: 'Oricorio (Baile Style)', labels: ['Baile Style'], rename: true },
+    { name: 'Oricorio (Pom-Pom Style)', labels: ['Pom-Pom Style'], separate: true },
+    { name: "Oricorio (Pa'u Style)", labels: ["Pa'u Style"], separate: true },
+    { name: 'Oricorio (Sensu Style)', labels: ['Sensu Style'], separate: true },
   ],
   lycanroc: [
-    { name: null, labels: ['Midday Form'] },
-    { name: 'Lycanroc (Midnight Form)', labels: ['Midnight Form'], separate: false },
-    { name: 'Lycanroc (Dusk Form)', labels: ['Dusk Form'], separate: false },
+    { name: 'Lycanroc (Midday Form)', labels: ['Midday Form'], rename: true },
+    { name: 'Lycanroc (Midnight Form)', labels: ['Midnight Form'], separate: true },
+    { name: 'Lycanroc (Dusk Form)', labels: ['Dusk Form'], separate: true },
   ],
   wishiwashi: [
     { name: null, labels: ['Solo Form'] },
@@ -263,26 +288,26 @@ const ALT_FORMS = {
   ],
   mimikyu: [
     { name: null, labels: ['Disguised Form'] },
-    { name: 'Mimikyu (Busted Form)', labels: ['Busted Form'], separate: false },
+    { name: 'Mimikyu (Busted Form)', labels: ['Busted Form'], separate: true, art: 'HOME0778B.png' },
   ],
   necrozma: [
-    { name: 'Dusk Mane Necrozma', labels: ['Dusk Mane'], separate: false },
-    { name: 'Dawn Wings Necrozma', labels: ['Dawn Wings'], separate: false },
-    { name: 'Ultra Necrozma', labels: ['Ultra Necrozma'], separate: false },
+    { name: 'Dusk Mane Necrozma', labels: ['Dusk Mane'], separate: true },
+    { name: 'Dawn Wings Necrozma', labels: ['Dawn Wings'], separate: true },
+    { name: 'Ultra Necrozma', labels: ['Ultra Necrozma'], separate: true },
   ],
   magearna: [
-    { name: 'Magearna (Original Color)', labels: ['Original Color'], separate: false },
+    { name: 'Magearna (Original Color)', labels: ['Original Color'], separate: true },
   ],
   greedent: [
-    { name: null, labels: ['Cook'] }, // Pokopia character
+    { labels: ['Cook'], drop: true }, // Pokopia character
   ],
   cramorant: [
-    { name: 'Cramorant (Gulping Form)', labels: ['Gulping Form'], separate: false },
-    { name: 'Cramorant (Gorging Form)', labels: ['Gorging Form'], separate: false },
+    { name: 'Cramorant (Gulping Form)', labels: ['Gulping Form'], separate: true },
+    { name: 'Cramorant (Gorging Form)', labels: ['Gorging Form'], separate: true },
   ],
   toxtricity: [
-    { name: null, labels: ['Amped Form'] },
-    { name: 'Toxtricity (Low Key Form)', labels: ['Low Key Form'], separate: false },
+    { name: 'Toxtricity (Amped Form)', labels: ['Amped Form'], rename: true },
+    { name: 'Toxtricity (Low Key Form)', labels: ['Low Key Form'], separate: true },
   ],
   sinistea: [
     { name: null, labels: ['Phony Form'] },
@@ -293,8 +318,9 @@ const ALT_FORMS = {
     { name: 'Polteageist (Antique Form)', labels: ['Antique Form'], separate: false },
   ],
   alcremie: [
-    { name: null, labels: ['Vanilla Cream', 'Ruby Cream', 'Matcha Cream', 'Mint Cream',
-      'Lemon Cream', 'Salted Cream', 'Ruby Swirl', 'Caramel Swirl', 'Rainbow Swirl'] },
+    { name: null, labels: ['Vanilla Cream'] }, // default flavor: its entries are the base's
+    { labels: ['Ruby Cream', 'Matcha Cream', 'Mint Cream', 'Lemon Cream', 'Salted Cream',
+      'Ruby Swirl', 'Caramel Swirl', 'Rainbow Swirl'], drop: true }, // per-flavor entries; keep only Vanilla's
   ],
   eiscue: [
     { name: null, labels: ['Ice Face'] },
@@ -320,18 +346,22 @@ const ALT_FORMS = {
     { name: 'Eternamax Eternatus', labels: ['Eternamax'], separate: false },
   ],
   urshifu: [
-    { name: null, labels: ['Single Strike Style'] },
-    { name: 'Urshifu (Rapid Strike Style)', labels: ['Rapid Strike Style'], separate: false },
+    { name: 'Urshifu (Single Strike Style)', labels: ['Single Strike Style'], rename: true },
+    { name: 'Urshifu (Rapid Strike Style)', labels: ['Rapid Strike Style'], separate: true },
+    { name: 'Gigantamax Urshifu (Single Strike Style)',
+      labels: ['Single Strike Style / Gigantamax'], separate: true },
+    { name: 'Gigantamax Urshifu (Rapid Strike Style)',
+      labels: ['Rapid Strike Style / Gigantamax'], separate: true },
   ],
   zarude: [
-    { name: 'Dada Zarude', labels: ['Dada'], separate: false },
+    { name: 'Dada Zarude', labels: ['Dada'], separate: true },
   ],
   calyrex: [
     { name: 'Ice Rider Calyrex', labels: ['Ice Rider'], separate: false },
     { name: 'Shadow Rider Calyrex', labels: ['Shadow Rider'], separate: false },
   ],
   ursaluna: [
-    { name: 'Bloodmoon Ursaluna', labels: ['Bloodmoon'], separate: false },
+    { name: 'Bloodmoon Ursaluna', labels: ['Bloodmoon'], separate: true },
   ],
   basculegion: [
     { name: null, labels: ['Male'] },
@@ -339,15 +369,15 @@ const ALT_FORMS = {
   ],
   enamorus: [
     { name: null, labels: ['Incarnate Forme'] },
-    { name: 'Enamorus (Therian Forme)', labels: ['Therian Forme'], separate: false },
+    { name: 'Enamorus (Therian Forme)', labels: ['Therian Forme'], separate: true },
   ],
   oinkologne: [
     { name: null, labels: ['Male'] },
     { name: 'Oinkologne (Female)', labels: ['Female'], separate: false },
   ],
   maushold: [
-    { name: null, labels: ['Family of Four'] },
-    { name: 'Maushold (Family of Three)', labels: ['Family of Three'], separate: false },
+    { name: 'Maushold (Family of Four)', labels: ['Family of Four'], rename: true },
+    { name: 'Maushold (Family of Three)', labels: ['Family of Three'], separate: true },
   ],
   squawkabilly: [
     { name: null, labels: ['Green Plumage'] },
@@ -356,11 +386,11 @@ const ALT_FORMS = {
     { name: 'Squawkabilly (White Plumage)', labels: ['White Plumage'], separate: false },
   ],
   tinkaton: [
-    { name: null, labels: ['Supervisor'] }, // Pokopia character
+    { labels: ['Supervisor'], drop: true }, // Pokopia character
   ],
   palafin: [
-    { name: null, labels: ['Zero Form'] },
-    { name: 'Palafin (Hero Form)', labels: ['Hero Form'], separate: false },
+    { name: 'Palafin (Zero Form)', labels: ['Zero Form'], rename: true },
+    { name: 'Palafin (Hero Form)', labels: ['Hero Form'], separate: true },
   ],
   tatsugiri: [
     { name: null, labels: ['Curly Form'] },
@@ -372,8 +402,8 @@ const ALT_FORMS = {
     { name: 'Dudunsparce (Three-Segment Form)', labels: ['Three-Segment Form'], separate: false },
   ],
   gimmighoul: [
-    { name: null, labels: ['Chest Form'] },
-    { name: 'Gimmighoul (Roaming Form)', labels: ['Roaming Form'], separate: false },
+    { name: 'Gimmighoul (Chest Form)', labels: ['Chest Form'], rename: true },
+    { name: 'Gimmighoul (Roaming Form)', labels: ['Roaming Form'], separate: true },
   ],
   koraidon: [
     { name: null, labels: ['Apex Build'] },
@@ -393,9 +423,9 @@ const ALT_FORMS = {
   ],
   ogerpon: [
     { name: null, labels: ['Teal Mask'] },
-    { name: 'Ogerpon (Wellspring Mask)', labels: ['Wellspring Mask'], separate: false },
-    { name: 'Ogerpon (Hearthflame Mask)', labels: ['Hearthflame Mask'], separate: false },
-    { name: 'Ogerpon (Cornerstone Mask)', labels: ['Cornerstone Mask'], separate: false },
+    { name: 'Ogerpon (Wellspring Mask)', labels: ['Wellspring Mask'], separate: true },
+    { name: 'Ogerpon (Hearthflame Mask)', labels: ['Hearthflame Mask'], separate: true },
+    { name: 'Ogerpon (Cornerstone Mask)', labels: ['Cornerstone Mask'], separate: true },
   ],
   terapagos: [
     { name: null, labels: ['Normal Form'] },
@@ -477,6 +507,8 @@ function cleanWikiText(text) {
     out = out.replace(/\{\{([^{}]*)\}\}/g, (_, inner) => {
       const parts = inner.split('|').map(s => s.trim());
       if (parts.length === 1) return ARGLESS[parts[0].toLowerCase()] ?? '';
+      // {{tt|*|Pokédex entry only found in Pokémon HOME}}: footnote marker, not text
+      if (parts[0].toLowerCase() === 'tt' && parts[1] === '*') return '';
       if (['tt', 'obp', 'scpkmn', 'scball'].includes(parts[0].toLowerCase())) return parts[1];
       return parts[parts.length - 1];
     });
@@ -591,21 +623,33 @@ function categoryAnswerName(label, baseName) {
   return null;
 }
 
-const answers = [];      // { id, name, dex }
+const answers = [];      // { id, name, base, dex }
 const entryFiles = new Map(); // id -> texts[]
 const artwork = new Map();    // id -> candidate archive filenames (fetch-artwork.mjs)
 const takenIds = new Set();
 const notes = [];
 
-function addAnswer(id, name, dex, texts, artCandidates) {
+// `base` is the plain species name ("Rotom" for Wash Rotom): the game censors
+// only these words in entries — form words stay visible
+function addAnswer(id, name, base, dex, texts, artCandidates) {
   if (takenIds.has(id)) throw new Error(`duplicate answer id: ${id}`);
   takenIds.add(id);
-  answers.push({ id, name, dex });
+  answers.push({ id, name, base, dex });
   entryFiles.set(id, texts);
   artwork.set(id, artCandidates);
 }
 
 const pad4 = n => String(n).padStart(4, '0');
+
+// Page art files that look like this form, most hint-word matches first:
+// "Rapid Strike" must outrank "Single Strike" (which also contains "Strike")
+function formArtScan(art, formName, spName) {
+  const hints = formName.replace(spName, '').split(/[^A-Za-z0-9%]+/).filter(w => w.length > 1)
+    .map(w => REGION_SUFFIX[w] ?? w)         // archive filenames say "Galar", not "Galarian"
+    .map(w => w.replace('%', 'Percent'));    // ... and "10Percent", not "10%"
+  const matches = f => hints.filter(h => f.includes(h)).length;
+  return art.filter(f => matches(f) > 0).sort((a, b) => matches(b) - matches(a));
+}
 
 // Artwork filenames referenced anywhere on the species' page, for candidates
 function pageArtFiles(sp) {
@@ -627,6 +671,20 @@ for (const sp of species) {
 
   for (const [label, texts] of byForm) {
     if (!label) continue;
+    // An explicit ALT_FORMS row wins over the Mega/Gmax/regional grouping, so
+    // a category label can be split out (Gigantamax Urshifu's two styles) —
+    // or, if its row says separate: false, merged into the BASE answer.
+    const row = labelToRow.get(label);
+    if (row) {
+      if (row.drop) continue; // discarded outright (Pokopia pseudo-forms)
+      if (row.separate) {
+        if (!separatePools.has(row)) separatePools.set(row, []);
+        separatePools.get(row).push(...texts);
+      } else {
+        basePool.push(...texts);
+      }
+      continue;
+    }
     const catName = categoryAnswerName(label, sp.name);
     if (catName) {
       if (!categoryPools.has(catName)) categoryPools.set(catName, { texts: [], labels: [] });
@@ -634,20 +692,19 @@ for (const sp of species) {
       categoryPools.get(catName).labels.push(label);
       continue;
     }
-    const row = labelToRow.get(label);
-    if (!row) notes.push(`${sp.slug}: merged unlisted label "${label}"`);
-    if (row?.separate) {
-      if (!separatePools.has(row)) separatePools.set(row, []);
-      separatePools.get(row).push(...texts);
-    } else {
-      basePool.push(...texts);
-    }
+    notes.push(`${sp.slug}: merged unlisted label "${label}"`);
+    basePool.push(...texts);
   }
 
   const art = pageArtFiles(sp);
   const baseArt = `${pad4(sp.dex)}${sp.name}.png`;
 
-  addAnswer(sp.slug, sp.name, sp.dex, dedupe(basePool), [baseArt]);
+  const renameRow = altRows.find(r => r.rename);
+  if (renameRow?.separate) throw new Error(`${sp.slug}: rename row cannot also be separate`);
+  // A renamed base is a specific form (e.g. Single Strike Urshifu); prefer its
+  // form artwork — the unsuffixed file may depict several forms at once
+  const baseScan = renameRow ? formArtScan(art, renameRow.name, sp.name) : [];
+  addAnswer(sp.slug, renameRow?.name ?? sp.name, sp.name, sp.dex, dedupe(basePool), [...baseScan, baseArt]);
 
   for (const [name, pool_] of categoryPools) {
     const texts = dedupe(pool_.texts);
@@ -658,15 +715,14 @@ for (const sp of species) {
       .filter(w => w.length > 1).map(w => REGION_SUFFIX[w] ?? w);
     const derived = deriveArtNames(name, sp);
     const scanned = art.filter(f => f !== baseArt && hints.some(h => f.includes(h)));
-    addAnswer(slugify(name), name, sp.dex, texts, [...new Set([...derived, ...scanned])]);
+    addAnswer(slugify(name), name, sp.name, sp.dex, texts, [...new Set([...derived, ...scanned])]);
   }
 
   for (const [row, texts] of separatePools) {
     const deduped = dedupe(texts);
     if (!deduped.length) { notes.push(`${sp.slug}: no entries for ${row.name}`); continue; }
-    const hints = row.name.replace(sp.name, '').split(/[^A-Za-z0-9%]+/).filter(w => w.length > 1);
-    const scanned = art.filter(f => hints.some(h => f.includes(h)));
-    addAnswer(slugify(row.name), row.name, sp.dex, deduped, scanned.length ? scanned : [baseArt]);
+    const scanned = [...(row.art ? [row.art] : []), ...formArtScan(art, row.name, sp.name)];
+    addAnswer(slugify(row.name), row.name, sp.name, sp.dex, deduped, scanned.length ? scanned : [baseArt]);
   }
 }
 
