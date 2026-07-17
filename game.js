@@ -4,8 +4,9 @@
 // Config & constants
 // ---------------------------------------------------------------------------
 
-// All data and images are baked into the site by scripts/build-data.mjs,
-// so the browser never calls PokéAPI directly.
+// All data and images are baked into the site by scripts/build-data.mjs
+// (dex entries) and scripts/fetch-artwork.mjs (images), both sourced from
+// Bulbapedia — the browser never calls any external API.
 const SPRITE_URL = id => `sprites/${id}.png`;
 
 const MAX_GUESSES = 3;
@@ -19,7 +20,7 @@ const STORAGE_ENDLESS = 'dexguesser-endless-v1';
 // ---------------------------------------------------------------------------
 
 const state = {
-  species: [],      // [{ id, slug, name, searchKey }]
+  species: [],      // [{ id, name, dex, searchKey }]
   mode: 'daily',    // 'daily' | 'endless'
   answer: null,     // the species to guess
   entrySeed: null,  // entries shuffle seed for the current endless game
@@ -83,7 +84,7 @@ async function loadSpeciesList() {
   const data = await res.json();
   return data.map(sp => ({
     ...sp,
-    searchKey: searchKey(sp.name) + '|' + searchKey(sp.slug),
+    searchKey: searchKey(sp.name) + '|' + searchKey(sp.id),
   }));
 }
 
@@ -97,14 +98,16 @@ async function loadSpeciesList() {
 const REDACT_KEEP = new Set([
   'mega', 'primal', 'gigantamax', 'gmax', 'style', 'breed', 'mode', 'standard', 'zen',
   'alolan', 'alola', 'galarian', 'galar', 'hisuian', 'hisui', 'paldean', 'paldea',
+  'form', 'forme', 'size', 'face', 'mask', 'rider', 'build', 'cloak', 'plumage',
+  'family', 'color', 'segment', 'striped', 'flower',
 ]);
 
 function redactName(text, species) {
-  const tokens = new Set([species.name, species.slug]);
+  const tokens = new Set([species.name, species.id]);
   for (const part of species.name.split(/[\s\-.()]+/)) {
     if (part.length >= 3 && !REDACT_KEEP.has(part.toLowerCase())) tokens.add(part);
   }
-  for (const part of species.slug.split('-')) {
+  for (const part of species.id.split('-')) {
     if (part.length >= 3 && !REDACT_KEEP.has(part)) tokens.add(part);
   }
   // Longest first so "Mr. Mime" is redacted before "Mime"
@@ -112,7 +115,9 @@ function redactName(text, species) {
   let out = text;
   for (const token of sorted) {
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp(escaped, 'gi'), '_____');
+    // Must start at a word boundary: "Male" may censor "males" but not
+    // "female", "Ice" not "nice" — form words are common English words now
+    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}`, 'giu'), '_____');
   }
   return out;
 }
@@ -185,9 +190,9 @@ function savedEndlessGame() {
 
 const $ = id => document.getElementById(id);
 
-// National dex number for display; mega/primal forms carry their base
-// Pokémon's number in `dex` (their internal id is a large form id)
-const dexNo = sp => String(sp.dex ?? sp.id).padStart(4, '0');
+// National dex number for display; every answer carries `dex` (forms use
+// their base Pokémon's number — their `id` is a name slug used as file key)
+const dexNo = sp => String(sp.dex).padStart(4, '0');
 
 function render() {
   renderEntries();
